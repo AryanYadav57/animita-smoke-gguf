@@ -1,0 +1,120 @@
+{
+  "version": "0.1",
+  "canvas": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "background": "#0B0D17"
+  },
+  "theme": {
+    "font": "Inter",
+    "primary": "#6C5CE7",
+    "text": "#FFFFFF",
+    "surface": "#161A2E",
+    "muted": "#9AA0B8"
+  },
+  "scenes": [
+    {
+      "id": "hero",
+      "duration": 5.0,
+      "elements": [
+        {
+          "id": "title",
+          "type": "heading",
+          "content": "Ship faster with Nimbus",
+          "style": {
+            "x": 160,
+            "y": 200,
+            "w": 1600,
+            "size": 96,
+            "weight": 800
+          },
+          "animations": [
+            {
+              "preset": "slide_up",
+              "start": 0.2,
+              "duration": 0.8,
+              "easing": "ease_out_cubic"
+            }
+          ]
+        },
+        {
+          "id": "subtitle",
+          "type": "text",
+          "content": "The release platform for teams that deploy every day.",
+          "style": {
+            "x": 160,
+            "y": 360,
+            "w": 1400,
+            "size": 36,
+            "color": "#9AA0B8"
+          },
+          "animations": [
+            {
+              "preset": "fade_in",
+              "start": 0.9,
+              "duration": 0.6,
+              "easing": "ease_out"
+            }
+          ]
+        },
+        {
+          "id": "cards",
+          "type": "shape",
+          "style": {
+            "shape": "rect",
+            "bg": "#00000000",
+            "x": 160,
+            "y": 540,
+            "w": 1600,
+            "h": 240
+          },
+          "animations": [
+            {
+              "preset": "stagger_children",
+              "start": 1.4,
+              "duration": 0.6,
+              "easing": "ease_out_cubic",
+              "stagger": 0.25
+            }
+          ],
+          "children": [
+            {
+              "id": "card1",
+              "type": "card",
+              "content": "Realtime sync",
+              "style": {
+                "x": 0,
+                "y": 0,
+                "w": 500,
+                "h": 220
+              }
+            },
+            {
+              "id": "card2",
+              "type": "card",
+              "content": "One-click rollbacks",
+              "style": {
+                "x": 550,
+                "y": 0,
+                "w": 500,
+                "h": 220
+              }
+            },
+            {
+              "id": "card3",
+              "type": "card",
+              "content": "Preview every branch",
+              "style": {
+                "x": 1100,
+                "y": 0,
+                "w": 500,
+                "h": 220
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

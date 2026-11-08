@@ -1,0 +1,118 @@
+{
+  "version": "0.1",
+  "canvas": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "background": "#0B0D17"
+  },
+  "theme": {
+    "font": "Inter",
+    "primary": "#6C5CE7",
+    "text": "#FFFFFF",
+    "surface": "#161A2E",
+    "muted": "#9AA0B8"
+  },
+  "scenes": [
+    {
+      "id": "metrics",
+      "duration": 5.0,
+      "elements": [
+        {
+          "id": "title",
+          "type": "heading",
+          "content": "Revenue is compounding",
+          "style": {
+            "x": 160,
+            "y": 120,
+            "w": 1600,
+            "size": 72,
+            "weight": 700
+          },
+          "animations": [
+            {
+              "preset": "slide_right",
+              "start": 0.1,
+              "duration": 0.7,
+              "easing": "ease_out_cubic"
+            }
+          ]
+        },
+        {
+          "id": "mrr",
+          "type": "counter",
+          "style": {
+            "x": 160,
+            "y": 340,
+            "w": 800,
+            "size": 160,
+            "weight": 800,
+            "value": 124000,
+            "prefix": "$",
+            "color": "#A29BFE"
+          },
+          "animations": [
+            {
+              "preset": "counter_up",
+              "start": 0.4,
+              "duration": 1.8,
+              "easing": "ease_out_cubic"
+            }
+          ]
+        },
+        {
+          "id": "mrr_label",
+          "type": "text",
+          "content": "Monthly recurring revenue",
+          "style": {
+            "x": 160,
+            "y": 560,
+            "w": 800,
+            "size": 36,
+            "color": "#9AA0B8"
+          },
+          "animations": [
+            {
+              "preset": "fade_in",
+              "start": 1.0,
+              "duration": 0.6,
+              "easing": "ease_out"
+            }
+          ]
+        },
+        {
+          "id": "chart",
+          "type": "bar_chart",
+          "style": {
+            "x": 1000,
+            "y": 260,
+            "w": 760,
+            "h": 560,
+            "values": [
+              32,
+              45,
+              58,
+              71,
+              96
+            ],
+            "labels": [
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct"
+            ]
+          },
+          "animations": [
+            {
+              "preset": "bar_grow",
+              "start": 0.6,
+              "duration": 1.4,
+              "easing": "ease_out_cubic"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

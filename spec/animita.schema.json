@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cairnstudios.dev/animita/spec/0.1/animita.schema.json",
+  "title": "Animita animation spec",
+  "description": "v0.1. The model writes this; the renderer plays it. Every field has a fixed set of allowed values or a numeric range. No free-form code.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "canvas", "scenes"],
+  "properties": {
+    "version": { "const": "0.1" },
+    "canvas": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height", "fps", "background"],
+      "properties": {
+        "width": { "type": "integer", "minimum": 320, "maximum": 3840 },
+        "height": { "type": "integer", "minimum": 320, "maximum": 3840 },
+        "fps": { "enum": [24, 30, 60] },
+        "background": { "$ref": "#/$defs/color" }
+      }
+    },
+    "theme": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "font": { "enum": ["Inter", "Poppins", "DM Sans", "Space Grotesk", "Playfair Display", "JetBrains Mono", "system"] },
+        "primary": { "$ref": "#/$defs/color" },
+        "text": { "$ref": "#/$defs/color" },
+        "surface": { "$ref": "#/$defs/color" },
+        "muted": { "$ref": "#/$defs/color" }
+      }
+    },
+    "scenes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": { "$ref": "#/$defs/scene" }
+    }
+  },
+  "$defs": {
+    "color": {
+      "type": "string",
+      "pattern": "^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$"
+    },
+    "easing": {
+      "enum": ["linear", "ease_in", "ease_out", "ease_in_out", "ease_out_cubic", "ease_out_back", "spring"]
+    },
+    "preset": {
+      "enum": [
+        "fade_in", "fade_out", "slide_up", "slide_down", "slide_left", "slide_right",
+        "scale_in", "pop", "typewriter", "counter_up", "bar_grow", "draw_line",
+        "pulse", "float", "stagger_children"
+      ]
+    },
+    "elementType": {
+      "enum": [
+        "text", "heading", "card", "button", "image_placeholder", "shape",
+        "icon_placeholder", "progress_bar", "counter", "bar_chart", "toast", "device_frame"
+      ]
+    },
+    "scene": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "duration", "elements"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,31}$" },
+        "duration": { "type": "number", "minimum": 0.5, "maximum": 20 },
+        "background": { "$ref": "#/$defs/color" },
+        "transition": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": {
+            "type": { "enum": ["cut", "fade", "slide", "wipe"] },
+            "duration": { "type": "number", "minimum": 0.1, "maximum": 2 }
+          }
+        },
+        "elements": {
+          "type": "array",
+          "maxItems": 24,
+          "items": { "$ref": "#/$defs/element" }
+        }
+      }
+    },
+    "element": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,31}$" },
+        "type": { "$ref": "#/$defs/elementType" },
+        "content": { "type": "string", "maxLength": 160 },
+        "style": { "$ref": "#/$defs/style" },
+        "animations": {
+          "type": "array",
+          "maxItems": 4,
+          "items": { "$ref": "#/$defs/animation" }
+        },
+        "children": {
+          "type": "array",
+          "maxItems": 8,
+          "items": { "$ref": "#/$defs/element" }
+        }
+      }
+    },
+    "animation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["preset", "start", "duration"],
+      "properties": {
+        "preset": { "$ref": "#/$defs/preset" },
+        "start": { "type": "number", "minimum": 0, "maximum": 20 },
+        "duration": { "type": "number", "minimum": 0.1, "maximum": 10 },
+        "easing": { "$ref": "#/$defs/easing" },
+        "stagger": { "type": "number", "minimum": 0.05, "maximum": 1, "description": "Delay between children. Only used by stagger_children." }
+      }
+    },
+    "style": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "x": { "type": "number", "minimum": -200, "maximum": 4000 },
+        "y": { "type": "number", "minimum": -200, "maximum": 4000 },
+        "w": { "type": "number", "minimum": 1, "maximum": 4000 },
+        "h": { "type": "number", "minimum": 1, "maximum": 4000 },
+        "size": { "type": "number", "minimum": 8, "maximum": 400, "description": "Font size in px." },
+        "weight": { "enum": [300, 400, 500, 600, 700, 800, 900] },
+        "align": { "enum": ["left", "center", "right"] },
+        "color": { "$ref": "#/$defs/color" },
+        "bg": { "$ref": "#/$defs/color" },
+        "radius": { "type": "number", "minimum": 0, "maximum": 400 },
+        "opacity": { "type": "number", "minimum": 0, "maximum": 1 },
+        "shape": { "enum": ["rect", "circle", "line"] },
+        "value": { "type": "number", "minimum": 0, "maximum": 1000000, "description": "progress_bar: 0-100. counter: target number." },
+        "values": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 12,
+          "items": { "type": "number", "minimum": 0, "maximum": 1000000 }
+        },
+        "labels": {
+          "type": "array",
+          "maxItems": 12,
+          "items": { "type": "string", "maxLength": 16 }
+        },
+        "prefix": { "type": "string", "maxLength": 4 },
+        "suffix": { "type": "string", "maxLength": 4 }
+      }
+    }
+  }
+}

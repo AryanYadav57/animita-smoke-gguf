@@ -1,0 +1,185 @@
+{
+  "version": "0.1",
+  "canvas": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "background": "#0B0D17"
+  },
+  "theme": {
+    "font": "Inter",
+    "primary": "#6C5CE7",
+    "text": "#FFFFFF",
+    "surface": "#161A2E",
+    "muted": "#9AA0B8"
+  },
+  "scenes": [
+    {
+      "id": "intro",
+      "duration": 3.0,
+      "elements": [
+        {
+          "id": "title",
+          "type": "heading",
+          "content": "Meet Flux",
+          "style": {
+            "x": 0,
+            "y": 360,
+            "w": 1920,
+            "size": 140,
+            "weight": 800,
+            "align": "center"
+          },
+          "animations": [
+            {
+              "preset": "fade_in",
+              "start": 0.2,
+              "duration": 0.6,
+              "easing": "ease_out"
+            },
+            {
+              "preset": "scale_in",
+              "start": 0.2,
+              "duration": 0.8,
+              "easing": "ease_out_cubic"
+            }
+          ]
+        },
+        {
+          "id": "sub",
+          "type": "text",
+          "content": "Build, preview, ship.",
+          "style": {
+            "x": 0,
+            "y": 560,
+            "w": 1920,
+            "size": 48,
+            "align": "center",
+            "color": "#9AA0B8"
+          },
+          "animations": [
+            {
+              "preset": "slide_up",
+              "start": 0.8,
+              "duration": 0.6,
+              "easing": "ease_out_cubic"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "product",
+      "duration": 5.0,
+      "transition": {
+        "type": "slide",
+        "duration": 0.6
+      },
+      "elements": [
+        {
+          "id": "headline",
+          "type": "heading",
+          "content": "See every deploy, live",
+          "style": {
+            "x": 160,
+            "y": 380,
+            "w": 760,
+            "size": 76,
+            "weight": 800
+          },
+          "animations": [
+            {
+              "preset": "slide_right",
+              "start": 0.5,
+              "duration": 0.7,
+              "easing": "ease_out_cubic"
+            }
+          ]
+        },
+        {
+          "id": "phone",
+          "type": "device_frame",
+          "style": {
+            "x": 1060,
+            "y": 100,
+            "w": 600,
+            "h": 880
+          },
+          "animations": [
+            {
+              "preset": "slide_left",
+              "start": 0.6,
+              "duration": 0.8,
+              "easing": "ease_out_cubic"
+            },
+            {
+              "preset": "float",
+              "start": 1.6,
+              "duration": 3.0,
+              "easing": "ease_in_out"
+            }
+          ],
+          "children": [
+            {
+              "id": "c1",
+              "type": "card",
+              "content": "Build passing",
+              "style": {
+                "x": 40,
+                "y": 120,
+                "w": 520,
+                "h": 130
+              },
+              "animations": [
+                {
+                  "preset": "fade_in",
+                  "start": 1.2,
+                  "duration": 0.5,
+                  "easing": "ease_out"
+                }
+              ]
+            },
+            {
+              "id": "c2",
+              "type": "card",
+              "content": "3 regions live",
+              "style": {
+                "x": 40,
+                "y": 280,
+                "w": 520,
+                "h": 130
+              },
+              "animations": [
+                {
+                  "preset": "fade_in",
+                  "start": 1.6,
+                  "duration": 0.5,
+                  "easing": "ease_out"
+                }
+              ]
+            },
+            {
+              "id": "bar",
+              "type": "progress_bar",
+              "style": {
+                "x": 40,
+                "y": 470,
+                "w": 520,
+                "h": 16,
+                "value": 82
+              },
+              "animations": [
+                {
+                  "preset": "bar_grow",
+                  "start": 2.0,
+                  "duration": 1.2,
+                  "easing": "ease_out_cubic"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

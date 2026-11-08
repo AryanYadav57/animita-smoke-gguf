@@ -1,0 +1,110 @@
+{
+  "version": "0.1",
+  "canvas": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "background": "#07080F"
+  },
+  "theme": {
+    "font": "Inter",
+    "primary": "#6C5CE7",
+    "text": "#FFFFFF",
+    "surface": "#161A2E",
+    "muted": "#9AA0B8"
+  },
+  "scenes": [
+    {
+      "id": "logo",
+      "duration": 4.0,
+      "elements": [
+        {
+          "id": "glow",
+          "type": "shape",
+          "style": {
+            "shape": "circle",
+            "bg": "#6C5CE733",
+            "x": 710,
+            "y": 180,
+            "w": 500,
+            "h": 500
+          },
+          "animations": [
+            {
+              "preset": "scale_in",
+              "start": 0.0,
+              "duration": 1.2,
+              "easing": "ease_out_cubic"
+            },
+            {
+              "preset": "pulse",
+              "start": 1.2,
+              "duration": 2.0,
+              "easing": "ease_in_out"
+            }
+          ]
+        },
+        {
+          "id": "mark",
+          "type": "icon_placeholder",
+          "style": {
+            "x": 860,
+            "y": 330,
+            "w": 200,
+            "h": 200
+          },
+          "animations": [
+            {
+              "preset": "pop",
+              "start": 0.3,
+              "duration": 0.8,
+              "easing": "ease_out_back"
+            }
+          ]
+        },
+        {
+          "id": "name",
+          "type": "heading",
+          "content": "Orbit",
+          "style": {
+            "x": 0,
+            "y": 650,
+            "w": 1920,
+            "size": 120,
+            "weight": 800,
+            "align": "center"
+          },
+          "animations": [
+            {
+              "preset": "slide_up",
+              "start": 0.7,
+              "duration": 0.7,
+              "easing": "ease_out_cubic"
+            }
+          ]
+        },
+        {
+          "id": "tagline",
+          "type": "text",
+          "content": "Your whole team, in one orbit.",
+          "style": {
+            "x": 0,
+            "y": 810,
+            "w": 1920,
+            "size": 40,
+            "align": "center",
+            "color": "#9AA0B8"
+          },
+          "animations": [
+            {
+              "preset": "typewriter",
+              "start": 1.4,
+              "duration": 1.4,
+              "easing": "linear"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

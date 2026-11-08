@@ -1,0 +1,108 @@
+{
+  "version": "0.1",
+  "canvas": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "background": "#0B0D17"
+  },
+  "theme": {
+    "font": "Inter",
+    "primary": "#6C5CE7",
+    "text": "#FFFFFF",
+    "surface": "#161A2E",
+    "muted": "#9AA0B8"
+  },
+  "scenes": [
+    {
+      "id": "deploy",
+      "duration": 5.5,
+      "elements": [
+        {
+          "id": "title",
+          "type": "heading",
+          "content": "Deploying to production",
+          "style": {
+            "x": 160,
+            "y": 240,
+            "w": 1600,
+            "size": 80,
+            "weight": 700
+          },
+          "animations": [
+            {
+              "preset": "fade_in",
+              "start": 0.1,
+              "duration": 0.6,
+              "easing": "ease_out"
+            }
+          ]
+        },
+        {
+          "id": "progress",
+          "type": "progress_bar",
+          "style": {
+            "x": 160,
+            "y": 440,
+            "w": 1000,
+            "h": 24,
+            "value": 100
+          },
+          "animations": [
+            {
+              "preset": "bar_grow",
+              "start": 0.6,
+              "duration": 1.8,
+              "easing": "ease_in_out"
+            }
+          ]
+        },
+        {
+          "id": "toast",
+          "type": "toast",
+          "content": "Deploy finished in 42s",
+          "style": {
+            "x": 1220,
+            "y": 120,
+            "w": 560,
+            "h": 120
+          },
+          "animations": [
+            {
+              "preset": "slide_left",
+              "start": 2.4,
+              "duration": 0.6,
+              "easing": "ease_out_back"
+            }
+          ]
+        },
+        {
+          "id": "cta",
+          "type": "button",
+          "content": "View live site",
+          "style": {
+            "x": 160,
+            "y": 600,
+            "w": 360,
+            "h": 96,
+            "size": 36
+          },
+          "animations": [
+            {
+              "preset": "pop",
+              "start": 3.0,
+              "duration": 0.6,
+              "easing": "ease_out_back"
+            },
+            {
+              "preset": "pulse",
+              "start": 3.8,
+              "duration": 1.2,
+              "easing": "ease_in_out"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

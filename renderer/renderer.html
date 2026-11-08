@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Animita renderer</title>
+<style>
+  :root { --bg:#0e1018; --panel:#171a26; --line:#2a2f42; --text:#e8eaf3; --muted:#8a90a8; --accent:#6C5CE7; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  #app { display: flex; flex-direction: column; height: 100%; }
+  #bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 14px;
+    background: var(--panel); border-bottom: 1px solid var(--line); }
+  button, label.btn { background: #232840; color: var(--text); border: 1px solid var(--line);
+    border-radius: 8px; padding: 6px 12px; cursor: pointer; font: inherit; }
+  button:hover, label.btn:hover { border-color: var(--accent); }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  input[type=range] { flex: 1 1 240px; min-width: 160px; accent-color: var(--accent); }
+  #time { font-variant-numeric: tabular-nums; color: var(--muted); min-width: 96px; }
+  #status { color: var(--muted); }
+  #status.err { color: #ff8a8a; }
+  #view { flex: 1; min-height: 0; display: grid; place-items: center; padding: 16px; overflow: hidden; }
+  #frame { position: relative; overflow: hidden; border-radius: 6px; box-shadow: 0 0 0 1px var(--line); }
+  #stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; overflow: hidden; }
+  .scene { position: absolute; inset: 0; overflow: hidden; }
+  .el { position: absolute; transform-origin: 50% 50%; will-change: transform, opacity; }
+  .el .clip { overflow: hidden; width: 100%; height: 100%; }
+  #drop { position: fixed; inset: 0; display: none; place-items: center; background: #0e1018cc;
+    font-size: 22px; border: 3px dashed var(--accent); }
+  #drop.on { display: grid; }
+  .hint { color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="bar">
+    <label class="btn">Open spec (.json)<input id="file" type="file" accept=".json,application/json" hidden></label>
+    <button id="play" type="button" aria-label="Play or pause">Play</button>
+    <button id="restart" type="button">Restart</button>
+    <input id="scrub" type="range" min="0" max="1000" value="0" aria-label="Scrub timeline">
+    <span id="time">0.00 / 0.00s</span>
+    <label class="hint"><input id="loop" type="checkbox" checked> loop</label>
+    <span id="status">No spec loaded. Open a file, drop one on this page, or add ?spec=path.json</span>
+  </div>
+  <div id="view"><div id="frame"><div id="stage"></div></div></div>
+  <div id="drop">Drop an Animita spec (.json) to play it</div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   Animita renderer v0.1
+   Pure function of time: render(t) draws the exact frame for t seconds.
+   No animation library, no network: frame export and offline use are deterministic.
+   ============================================================ */
+
+const FONTS = {
+  "Inter": "Inter, system-ui, sans-serif", "Poppins": "Poppins, system-ui, sans-serif",
+  "DM Sans": "'DM Sans', system-ui, sans-serif", "Space Grotesk": "'Space Grotesk', system-ui, sans-serif",
+  "Playfair Display": "'Playfair Display', Georgia, serif", "JetBrains Mono": "'JetBrains Mono', ui-monospace, monospace",
+  "system": "system-ui, -apple-system, 'Segoe UI', sans-serif"
+};
+
+const EASE = {
+  linear: t => t,
+  ease_in: t => t * t,
+  ease_out: t => 1 - (1 - t) * (1 - t),
+  ease_in_out: t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2,
+  ease_out_cubic: t => 1 - Math.pow(1 - t, 3),
+  ease_out_back: t => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); },
+  spring: t => 1 - Math.exp(-6 * t) * Math.cos(10 * t)
+};
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const ease = (name, t) => { t = clamp(t, 0, 1); if (t === 0) return 0; if (t === 1) return 1; return (EASE[name] || EASE.ease_out)(t); };
+
+const ENTRANCE = new Set(["fade_in", "slide_up", "slide_down", "slide_left", "slide_right", "scale_in", "pop",
+  "typewriter", "counter_up", "bar_grow", "draw_line", "stagger_children"]);
+const SLIDE_DIST = 70;
+
+let spec = null, theme = null, scenes = [], totalDuration = 0, curT = 0, playing = false, lastTs = 0;
+const $ = id => document.getElementById(id);
+const stage = $("stage"), frame = $("frame");
+
+/* ---------- build DOM ---------- */
+function T(t) { return Object.assign({ font: "Inter", primary: "#6C5CE7", text: "#FFFFFF", surface: "#161A2E", muted: "#9AA0B8" }, t || {}); }
+
+function mk(tag, css, text) {
+  const n = document.createElement(tag);
+  if (css) Object.assign(n.style, css);
+  if (text !== undefined) n.textContent = text;
+  return n;
+}
+
+function buildElement(el, parentIsContainer) {
+  const s = el.style || {};
+  const wrap = mk("div", { left: (s.x || 0) + "px", top: (s.y || 0) + "px" });
+  wrap.className = "el";
+  wrap.dataset.id = el.id;
+  const font = FONTS[theme.font] || FONTS.Inter;
+  const w = s.w, h = s.h;
+  if (w) wrap.style.width = w + "px";
+  if (h) wrap.style.height = h + "px";
+  wrap.style.fontFamily = font;
+  wrap.style.color = s.color || theme.text;
+  wrap.style.textAlign = s.align || "left";
+  const o = { el, wrap, parts: {}, baseOpacity: s.opacity === undefined ? 1 : s.opacity, kids: [] };
+
+  switch (el.type) {
+    case "heading":
+    case "text": {
+      wrap.style.fontSize = (s.size || (el.type === "heading" ? 64 : 32)) + "px";
+      wrap.style.fontWeight = s.weight || (el.type === "heading" ? 700 : 400);
+      wrap.style.lineHeight = el.type === "heading" ? "1.08" : "1.35";
+      wrap.style.letterSpacing = el.type === "heading" ? "-0.02em" : "0";
+      wrap.style.whiteSpace = "pre-wrap";
+      o.parts.text = wrap; o.full = el.content || ""; wrap.textContent = o.full; break;
+    }
+    case "counter": {
+      wrap.style.fontSize = (s.size || 120) + "px";
+      wrap.style.fontWeight = s.weight || 800;
+      wrap.style.lineHeight = "1.05";
+      wrap.style.fontVariantNumeric = "tabular-nums";
+      o.parts.num = wrap; break;
+    }
+    case "card": {
+      Object.assign(wrap.style, { width: (w || 420) + "px", height: (h || 180) + "px", background: s.bg || theme.surface,
+        borderRadius: (s.radius === undefined ? 20 : s.radius) + "px", border: "1px solid #ffffff1a",
+        display: "flex", alignItems: "center", justifyContent: "center", padding: "24px",
+        fontSize: (s.size || 34) + "px", fontWeight: s.weight || 600, textAlign: s.align || "center" });
+      wrap.textContent = el.content || ""; break;
+    }
+    case "button": {
+      Object.assign(wrap.style, { width: (w || 320) + "px", height: (h || 84) + "px", background: s.bg || theme.primary,
+        color: s.color || "#FFFFFF", borderRadius: (s.radius === undefined ? 999 : s.radius) + "px",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: (s.size || 32) + "px", fontWeight: s.weight || 600, textAlign: "center" });
+      wrap.textContent = el.content || "Button"; break;
+    }
+    case "toast": {
+      Object.assign(wrap.style, { width: (w || 520) + "px", height: (h || 112) + "px", background: s.bg || theme.surface,
+        borderRadius: (s.radius === undefined ? 18 : s.radius) + "px", border: "1px solid #ffffff1a",
+        borderLeft: "8px solid " + theme.primary, display: "flex", alignItems: "center",
+        padding: "0 28px", fontSize: (s.size || 30) + "px", fontWeight: s.weight || 600,
+        boxShadow: "0 18px 40px #00000066" });
+      wrap.textContent = el.content || ""; break;
+    }
+    case "image_placeholder": {
+      Object.assign(wrap.style, { width: (w || 480) + "px", height: (h || 320) + "px",
+        borderRadius: (s.radius === undefined ? 20 : s.radius) + "px",
+        background: `repeating-linear-gradient(135deg, ${theme.surface} 0 18px, #1d2238 18px 36px)`,
+        border: "1px solid #ffffff1a", display: "flex", alignItems: "center", justifyContent: "center",
+        color: theme.muted, fontSize: (s.size || 26) + "px" });
+      wrap.textContent = el.content || "image"; break;
+    }
+    case "icon_placeholder": {
+      const d = Math.min(w || 160, h || 160);
+      Object.assign(wrap.style, { width: d + "px", height: d + "px", borderRadius: (s.radius === undefined ? d * 0.28 : s.radius) + "px",
+        background: s.bg || theme.primary, display: "flex", alignItems: "center", justifyContent: "center",
+        color: "#FFFFFF", fontSize: d * 0.5 + "px", fontWeight: 700 });
+      wrap.textContent = "\u2726"; break;
+    }
+    case "shape": {
+      const shape = s.shape || "rect";
+      if (shape === "line") {
+        Object.assign(wrap.style, { width: (w || 400) + "px", height: (h || 4) + "px", background: s.bg || theme.primary,
+          borderRadius: "999px", transformOrigin: "0 50%" });
+        o.isLine = true;
+      } else {
+        Object.assign(wrap.style, { width: (w || 300) + "px", height: (h || 300) + "px", background: s.bg || theme.primary,
+          borderRadius: shape === "circle" ? "50%" : (s.radius || 0) + "px" });
+      }
+      break;
+    }
+    case "progress_bar": {
+      Object.assign(wrap.style, { width: (w || 600) + "px", height: (h || 20) + "px", background: "#ffffff1c",
+        borderRadius: "999px", overflow: "hidden" });
+      const fill = mk("div", { height: "100%", width: "0%", background: s.bg || theme.primary, borderRadius: "999px" });
+      wrap.appendChild(fill); o.parts.fill = fill; o.target = clamp(s.value === undefined ? 100 : s.value, 0, 100); break;
+    }
+    case "bar_chart": {
+      const vals = s.values && s.values.length ? s.values : [30, 50, 70], labs = s.labels || [];
+      const W = w || 700, H = h || 420, max = Math.max(...vals, 1), labelH = labs.length ? 44 : 0;
+      Object.assign(wrap.style, { width: W + "px", height: H + "px" });
+      const row = mk("div", { position: "absolute", left: 0, right: 0, top: 0, bottom: labelH + "px", display: "flex",
+        alignItems: "flex-end", gap: Math.round(W / (vals.length * 4)) + "px" });
+      o.parts.bars = [];
+      vals.forEach((v, i) => {
+        const col = mk("div", { flex: 1, height: "100%", display: "flex", alignItems: "flex-end" });
+        const bar = mk("div", { width: "100%", height: (v / max * 100) + "%", transformOrigin: "50% 100%",
+          background: i === vals.length - 1 ? theme.primary : "#ffffff30", borderRadius: "10px 10px 0 0" });
+        col.appendChild(bar); row.appendChild(col); o.parts.bars.push(bar);
+      });
+      wrap.appendChild(row);
+      if (labs.length) {
+        const lr = mk("div", { position: "absolute", left: 0, right: 0, bottom: 0, height: labelH + "px", display: "flex",
+          gap: Math.round(W / (vals.length * 4)) + "px", alignItems: "center", color: theme.muted, fontSize: "24px" });
+        vals.forEach((_, i) => lr.appendChild(mk("div", { flex: 1, textAlign: "center" }, labs[i] || "")));
+        wrap.appendChild(lr);
+      }
+      break;
+    }
+    case "device_frame": {
+      const W = w || 520, H = h || 880;
+      Object.assign(wrap.style, { width: W + "px", height: H + "px", background: "#0a0c14", borderRadius: (s.radius || 56) + "px",
+        border: "10px solid #2b3050", boxShadow: "0 30px 80px #00000088", overflow: "hidden" });
+      wrap.appendChild(mk("div", { position: "absolute", left: "50%", top: "14px", width: "120px", height: "22px",
+        marginLeft: "-60px", background: "#2b3050", borderRadius: "999px" }));
+      break;
+    }
+    default: wrap.textContent = el.content || "";
+  }
+
+  (el.children || []).forEach(c => {
+    const co = buildElement(c, true);
+    wrap.appendChild(co.wrap);
+    o.kids.push(co);
+  });
+  o.wrap.style.opacity = o.baseOpacity;
+  return o;
+}
+
+function load(next) {
+  spec = next; theme = T(spec.theme);
+  stage.innerHTML = ""; scenes = []; totalDuration = 0;
+  stage.style.width = spec.canvas.width + "px"; stage.style.height = spec.canvas.height + "px";
+  stage.style.background = spec.canvas.background;
+  stage.style.fontFamily = FONTS[theme.font] || FONTS.Inter;
+  spec.scenes.forEach((sc, i) => {
+    const layer = mk("div", { background: sc.background || spec.canvas.background });
+    layer.className = "scene";
+    const els = (sc.elements || []).map(e => buildElement(e, false));
+    els.forEach(o => layer.appendChild(o.wrap));
+    stage.appendChild(layer);
+    const tr = i > 0 && sc.transition && sc.transition.type !== "cut" ? sc.transition : null;
+    scenes.push({ sc, layer, els, start: totalDuration, dur: sc.duration, tr, trDur: tr ? (tr.duration || 0.5) : 0 });
+    totalDuration += sc.duration;
+  });
+  fit(); curT = 0; seek(0);
+  $("scrub").value = 0; updateTime();
+  setStatus(`Loaded: ${spec.scenes.length} scene(s), ${totalDuration.toFixed(1)}s, ${spec.canvas.width}x${spec.canvas.height} @ ${spec.canvas.fps}fps`);
+}
+
+/* ---------- animation maths ---------- */
+function applyAnimations(o, tl) {
+  const el = o.el, s = el.style || {};
+  let op = o.baseOpacity, tx = 0, ty = 0, sc = 1, sx = 1;
+  let text = null, num = null, fillPct = null, barK = null, lineK = null;
+  const anims = el.animations || [];
+  const entr = anims.filter(a => ENTRANCE.has(a.preset));
+  // Hidden before the first entrance starts.
+  if (entr.length && tl < Math.min(...entr.map(a => a.start))) op = 0;
+
+  anims.forEach(a => {
+    const raw = (tl - a.start) / a.duration;
+    const e = ease(a.easing || "ease_out", raw);
+    const eo = (a.easing === "ease_out_back" || a.easing === "spring") ? e : clamp(e, 0, 1);
+    switch (a.preset) {
+      case "fade_in": op *= clamp(e, 0, 1); break;
+      case "fade_out": op *= 1 - clamp(e, 0, 1); break;
+      case "slide_up": ty += (1 - eo) * SLIDE_DIST; op *= clamp(e, 0, 1); break;
+      case "slide_down": ty -= (1 - eo) * SLIDE_DIST; op *= clamp(e, 0, 1); break;
+      case "slide_left": tx += (1 - eo) * SLIDE_DIST * 1.4; op *= clamp(e, 0, 1); break;
+      case "slide_right": tx -= (1 - eo) * SLIDE_DIST * 1.4; op *= clamp(e, 0, 1); break;
+      case "scale_in": sc *= 0.82 + 0.18 * eo; op *= clamp(e, 0, 1); break;
+      case "pop": sc *= Math.max(0, eo); op *= clamp(e * 3, 0, 1); break;
+      case "typewriter": if (o.full !== undefined) text = o.full.slice(0, Math.floor(clamp(e, 0, 1) * o.full.length + 1e-9)); break;
+      case "counter_up": num = (s.value || 0) * clamp(e, 0, 1); break;
+      case "bar_grow": if (o.parts.fill) fillPct = o.target * clamp(e, 0, 1); else barK = clamp(e, 0, 1); break;
+      case "draw_line": lineK = clamp(e, 0, 1); break;
+      case "pulse": if (raw > 0 && raw < 1) { const cycles = Math.max(1, Math.round(a.duration)); sc *= 1 + 0.06 * Math.sin(raw * cycles * 2 * Math.PI); } break;
+      case "float": if (raw > 0 && raw < 1) { const cycles = Math.max(1, Math.round(a.duration / 2)); ty += -10 * Math.sin(raw * cycles * 2 * Math.PI); } break;
+      case "stagger_children": {
+        const gap = a.stagger || 0.15;
+        o.kids.forEach((k, i) => {
+          const r = (tl - a.start - i * gap) / a.duration, ke = ease(a.easing || "ease_out_cubic", r);
+          k.wrap.style.opacity = k.baseOpacity * clamp(ke, 0, 1);
+          k.wrap.style.transform = `translateY(${(1 - clamp(ke, 0, 1)) * 50}px)`;
+          k.staggered = true;
+        });
+        break;
+      }
+    }
+  });
+
+  // Untimed state for elements that need an initial value
+  if (o.parts.num) {
+    const v = num === null ? (s.value || 0) : num;
+    o.parts.num.textContent = (s.prefix || "") + Math.round(v).toLocaleString("en-US") + (s.suffix || "");
+  }
+  if (text !== null && o.parts.text) o.parts.text.textContent = text;
+  if (o.parts.fill) o.parts.fill.style.width = (fillPct === null ? o.target : fillPct) + "%";
+  if (o.parts.bars) o.parts.bars.forEach((b, i) => { b.style.transform = `scaleY(${barK === null ? 1 : clamp(barK * 1.0, 0, 1)})`; });
+  if (o.isLine) sx = lineK === null ? 1 : lineK;
+
+  o.wrap.style.opacity = op;
+  o.wrap.style.transform = `translate(${tx}px, ${ty}px) scale(${sc * sx}, ${sc})`;
+  if (o.isLine) o.wrap.style.transform = `translate(${tx}px, ${ty}px) scale(${sx}, 1)`;
+  o.kids.forEach(k => { if (!k.staggered) applyAnimations(k, tl); else applyKidAnims(k, tl); });
+}
+function applyKidAnims(k, tl) { /* children of a stagger parent are driven by the parent; nested animations are ignored */ }
+
+function render(t) {
+  t = clamp(t, 0, totalDuration);
+  let idx = scenes.findIndex((S, i) => t < S.start + S.dur || i === scenes.length - 1);
+  scenes.forEach((S, i) => { S.layer.style.display = "none"; S.layer.style.transform = ""; S.layer.style.opacity = 1; S.layer.style.clipPath = ""; S.layer.style.zIndex = i; });
+  const S = scenes[idx], tl = t - S.start;
+  S.els.forEach(o => { o.staggered = false; applyAnimations(o, tl); });
+  S.layer.style.display = "block";
+  if (S.tr && tl < S.trDur && idx > 0) {
+    const P = scenes[idx - 1], k = ease("ease_in_out", tl / S.trDur), W = spec.canvas.width;
+    P.els.forEach(o => { o.staggered = false; applyAnimations(o, P.dur); });
+    P.layer.style.display = "block";
+    if (S.tr.type === "fade") S.layer.style.opacity = k;
+    if (S.tr.type === "slide") { S.layer.style.transform = `translateX(${(1 - k) * W}px)`; P.layer.style.transform = `translateX(${-k * W * 0.3}px)`; }
+    if (S.tr.type === "wipe") S.layer.style.clipPath = `inset(0 ${(1 - k) * 100}% 0 0)`;
+  }
+}
+
+/* ---------- transport ---------- */
+function seek(t) { curT = clamp(t, 0, totalDuration); if (spec) render(curT); updateTime(); }
+function updateTime() {
+  $("time").textContent = `${curT.toFixed(2)} / ${totalDuration.toFixed(2)}s`;
+  $("scrub").value = totalDuration ? Math.round(curT / totalDuration * 1000) : 0;
+}
+function tick(ts) {
+  if (!playing) return;
+  const dt = (ts - lastTs) / 1000; lastTs = ts;
+  let t = curT + dt;
+  if (t >= totalDuration) { if ($("loop").checked) t = 0; else { t = totalDuration; setPlaying(false); } }
+  seek(t); requestAnimationFrame(tick);
+}
+function setPlaying(p) {
+  playing = p; $("play").textContent = p ? "Pause" : "Play";
+  if (p) { if (curT >= totalDuration) curT = 0; lastTs = performance.now(); requestAnimationFrame(tick); }
+}
+function fit() {
+  if (!spec) return;
+  const v = $("view"), pad = 32, aw = v.clientWidth - pad, ah = v.clientHeight - pad;
+  const k = Math.min(aw / spec.canvas.width, ah / spec.canvas.height);
+  stage.style.transform = `scale(${k})`;
+  frame.style.width = spec.canvas.width * k + "px"; frame.style.height = spec.canvas.height * k + "px";
+}
+function setStatus(msg, err) { const s = $("status"); s.textContent = msg; s.className = err ? "err" : ""; }
+
+/* ---------- loading ---------- */
+function loadText(text, label) {
+  try { load(JSON.parse(text)); if (label) setStatus(label + " | " + $("status").textContent); }
+  catch (e) { setStatus("Could not load spec: " + e.message, true); }
+}
+$("file").addEventListener("change", e => { const f = e.target.files[0]; if (f) f.text().then(t => loadText(t, f.name)); });
+$("play").addEventListener("click", () => setPlaying(!playing));
+$("restart").addEventListener("click", () => { seek(0); setPlaying(true); });
+$("scrub").addEventListener("input", e => { setPlaying(false); seek(e.target.value / 1000 * totalDuration); });
+window.addEventListener("resize", fit);
+["dragenter", "dragover"].forEach(ev => window.addEventListener(ev, e => { e.preventDefault(); $("drop").classList.add("on"); }));
+["dragleave", "drop"].forEach(ev => window.addEventListener(ev, e => { e.preventDefault(); $("drop").classList.remove("on"); }));
+window.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) f.text().then(t => loadText(t, f.name)); });
+document.addEventListener("keydown", e => { if (e.code === "Space" && e.target.tagName !== "INPUT") { e.preventDefault(); setPlaying(!playing); } });
+
+const q = new URLSearchParams(location.search).get("spec");
+if (q) fetch(q).then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
+  .then(t => { loadText(t, q); setPlaying(true); })
+  .catch(e => setStatus("Could not fetch " + q + " (" + e.message + "). From a file:// page, use Open spec instead, or run: python -m http.server", true));
+
+/* ---------- API for the data pipeline and the Playwright exporter ---------- */
+window.Animita = {
+  load, seek, duration: () => totalDuration, fps: () => (spec ? spec.canvas.fps : 30),
+  play: () => setPlaying(true), pause: () => setPlaying(false),
+  /* Smoke test: build the spec, render several frames, report errors and layout overflow. */
+  smokeTest(next) {
+    const errors = [], warnings = [];
+    try {
+      load(next);
+      const W = spec.canvas.width, H = spec.canvas.height, n = Math.max(8, Math.ceil(totalDuration * 4));
+      for (let i = 0; i <= n; i++) seek(totalDuration * i / n);
+      scenes.forEach(S => {
+        seek(S.start + S.dur - 0.01);                       // end of each scene: everything should be in place
+        S.els.forEach(o => {
+          const s = (o.el.style || {});
+          const w = s.w || o.wrap.offsetWidth, h = s.h || o.wrap.offsetHeight;
+          if ((s.x || 0) + w > W + 2 || (s.y || 0) + h > H + 2 || (s.x || 0) < -2 || (s.y || 0) < -2)
+            warnings.push(`${S.sc.id}/${o.el.id} extends outside the canvas`);
+        });
+      });
+      seek(0);
+    } catch (e) { errors.push(String(e && e.message || e)); }
+    return { ok: errors.length === 0, errors, warnings };
+  }
+};
+</script>
+</body>
+</html>
