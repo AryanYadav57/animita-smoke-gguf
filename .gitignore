@@ -1,0 +1,18 @@
+# big or private files
+models/*.gguf
+models/animita-lora/
+data/raw/
+.env
+
+# python
+__pycache__/
+.venv/
+*.pyc
+
+# node
+node_modules/
+
+# render output
+frames/
+*.mp4
+*.gif
